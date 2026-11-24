@@ -85,25 +85,116 @@ def parse_cell(cell):
 
 
 def parse_tsv(text, nationality_name):
-    raw = pd.read_csv(io.StringIO(text), sep="\t", dtype=str)
+    """
+    Convert the wide Eurostat TSV response into tidy monthly observations.
+
+    This version parses the Eurostat time-series rows directly instead
+    of using pandas.melt(), which avoids duplicate-column problems.
+    """
+
+    raw = pd.read_csv(
+        io.StringIO(text),
+        sep="\t",
+        dtype=str
+    )
+
     if raw.empty:
         return pd.DataFrame()
 
+    # First column contains the SDMX series dimensions.
+    #
+    # Example:
+    # freq,unit,citizen,sex,applicant,age,geo\\TIME_PERIOD
     series_col = raw.columns[0]
-    dim_names = series_col.replace("\\TIME_PERIOD", "").split(",")
-    series_values = raw[series_col].str.split(",", expand=True)
-    series_values.columns = dim_names
-    wide = pd.concat([series_values, raw.drop(columns=[series_col])], axis=1)
-    period_cols = list(raw.columns[1:])
 
-    tidy = wide.melt(id_vars=dim_names, value_vars=period_cols, var_name="Period", value_name="Observation")
-    tidy["Period"] = tidy["Period"].astype(str).str.strip()
-    parsed = tidy["Observation"].apply(parse_cell)
-    tidy[["First-time applications", "Status"]] = pd.DataFrame(parsed.tolist(), index=tidy.index)
-    tidy = tidy.dropna(subset=["First-time applications"])
-    tidy["Nationality"] = nationality_name
-    tidy["Date"] = pd.to_datetime(tidy["Period"], format="%Y-%m", errors="coerce")
-    return tidy.dropna(subset=["Date"])
+    dimension_names = (
+        series_col
+        .replace("\\TIME_PERIOD", "")
+        .split(",")
+    )
+
+    dimension_names = [
+        name.strip()
+        for name in dimension_names
+    ]
+
+    # Every column after the first one represents a month.
+    #
+    # Example:
+    # 2021-01
+    # 2021-02
+    # 2021-03
+    period_columns = [
+        column
+        for column in raw.columns[1:]
+        if str(column).strip()
+    ]
+
+    records = []
+
+    # Process each Eurostat time series.
+    for _, source_row in raw.iterrows():
+
+        series_key = str(
+            source_row.iloc[0]
+        )
+
+        dimension_values = [
+            value.strip()
+            for value in series_key.split(",")
+        ]
+
+        # Pair dimension names with their values.
+        dimensions = dict(
+            zip(
+                dimension_names,
+                dimension_values
+            )
+        )
+
+        # Process every monthly observation.
+        for period_column in period_columns:
+
+            value, status = parse_cell(
+                source_row[period_column]
+            )
+
+            # ":" and other unavailable observations
+            # are returned as None by parse_cell().
+            if value is None:
+                continue
+
+            period = str(
+                period_column
+            ).strip()
+
+            date = pd.to_datetime(
+                period,
+                format="%Y-%m",
+                errors="coerce"
+            )
+
+            if pd.isna(date):
+                continue
+
+            record = dimensions.copy()
+
+            record.update(
+                {
+                    "Period": period,
+                    "Date": date,
+                    "First-time applications": value,
+                    "Status": status,
+                    "Nationality": nationality_name,
+                }
+            )
+
+            records.append(record)
+
+    if not records:
+        return pd.DataFrame()
+
+    return pd.DataFrame(records)
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
