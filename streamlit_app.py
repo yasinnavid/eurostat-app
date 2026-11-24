@@ -21,52 +21,53 @@ st.set_page_config(
 # =========================================================
 # DESIGN
 # =========================================================
-EU_BLUE = "#003399"
-UNHCR_BLUE = "#0072BC"
-NAVY = "#003B5C"
-GRID = "#DCE5F2"
-COLORS = [
-    EU_BLUE,
-    UNHCR_BLUE,
-    "#4E79A7",
-    "#59C3E6",
-    "#6F4EBA",
-    "#2A9D8F",
-    "#F4A261",
-    "#E76F51",
-]
+FOREST = "#174A3A"
+GREEN = "#267653"
+MID_GREEN = "#4C9A73"
+LIGHT_GREEN = "#DDEFE4"
+PALE_GREEN = "#F3F8F4"
+TEXT = "#29483B"
+GRID = "#E1EAE3"
+COLORS = px.colors.qualitative.Dark24 + px.colors.qualitative.Light24
 
 st.markdown(
     """
     <style>
-    .stApp {background:linear-gradient(180deg,#F8FAFF 0%,#EDF3FA 100%);}
-    .block-container {padding-top:1.3rem;padding-bottom:2rem;max-width:1480px;}
-    h1,h2,h3 {color:#003B5C;}
-    .hero {padding:24px 28px;border-radius:18px;color:white;margin-bottom:18px;
-        background:linear-gradient(110deg,#003B5C,#003399 55%,#0072BC);
-        box-shadow:0 10px 30px rgba(0,51,153,.18);}
-    .hero h1 {color:white;margin:0;font-size:2rem;}
-    .hero p {color:#EAF0FF;margin:8px 0 0;}
-    .section-title {font-size:1.15rem;font-weight:750;color:#003B5C;margin:16px 0 8px;}
-    div[data-testid="stMetric"] {background:white;border:1px solid #D4E1F1;
-        padding:17px 19px;border-radius:15px;box-shadow:0 5px 16px rgba(0,59,92,.07);}
-    div[data-testid="stMetricLabel"] {color:#516979;font-weight:600;}
-    div[data-testid="stMetricValue"] {color:#003399;font-weight:800;}
-    div[data-testid="stPlotlyChart"] {background:white;border:1px solid #D4E1F1;
-        border-radius:15px;padding:8px;overflow:hidden;box-shadow:0 5px 16px rgba(0,59,92,.06);}
-    section[data-testid="stSidebar"] {background:#003B5C;}
+    .stApp {background:linear-gradient(180deg,#FAFCFA 0%,#F0F6F1 100%);}
+    .block-container {padding-top:1.25rem;padding-bottom:2rem;max-width:1500px;}
+    h1,h2,h3 {color:#174A3A;}
+    .hero {padding:25px 30px;border-radius:18px;color:white;margin-bottom:20px;
+        background:linear-gradient(110deg,#123B30 0%,#1F654B 58%,#2F8963 100%);
+        box-shadow:0 10px 28px rgba(23,74,58,.16);}
+    .hero h1 {color:white;margin:0;font-size:2rem;font-weight:750;}
+    .hero p {color:#E5F3E9;margin:8px 0 0;}
+    .section-title {font-size:1.15rem;font-weight:750;color:#174A3A;margin:18px 0 9px;}
+    div[data-testid="stMetric"] {
+        background:#FFFFFF;border:1px solid #DCE9DF;padding:17px 19px;
+        border-radius:15px;box-shadow:0 5px 16px rgba(23,74,58,.07);
+        height:132px;min-height:132px;box-sizing:border-box;
+        display:flex;flex-direction:column;justify-content:space-between;
+    }
+    div[data-testid="stMetricLabel"] {color:#587365;font-weight:600;}
+    div[data-testid="stMetricValue"] {color:#1F654B;font-weight:800;}
+    div[data-testid="stMetricDelta"] {font-size:.82rem;}
+    div[data-testid="stPlotlyChart"] {
+        background:white;border:1px solid #DCE9DF;border-radius:15px;
+        padding:8px;overflow:hidden;box-shadow:0 5px 16px rgba(23,74,58,.055);
+    }
+    section[data-testid="stSidebar"] {background:#174A3A;}
     section[data-testid="stSidebar"] h1,section[data-testid="stSidebar"] h2,
     section[data-testid="stSidebar"] h3,section[data-testid="stSidebar"] label,
     section[data-testid="stSidebar"] p {color:white !important;}
-    section[data-testid="stSidebar"] button {border-radius:10px;}
-    section[data-testid="stSidebar"] button p {color:#111 !important;}
-    .note {background:#FFF;border-left:5px solid #FFCC00;padding:11px 14px;
-        border-radius:0 10px 10px 0;color:#365B6D;margin:8px 0 14px;}
+    section[data-testid="stSidebar"] button {border-radius:9px;}
+    section[data-testid="stSidebar"] button p {color:#173D30 !important;}
+    .note {background:#FFFFFF;border-left:5px solid #4C9A73;padding:11px 14px;
+        border-radius:0 10px 10px 0;color:#365B49;margin:8px 0 14px;}
+    div[data-testid="stExpander"] {border:1px solid #DCE9DF;border-radius:12px;}
     </style>
     """,
     unsafe_allow_html=True,
 )
-
 
 # =========================================================
 # EUROSTAT CONFIGURATION
@@ -79,7 +80,7 @@ CFG = {
     "sex": ["M", "F", "UNK"],
     "applicant": ["FRST"],
     "age": ["Y_LT14", "Y14-17", "Y18-34", "Y35-64", "Y_GE65", "UNK"],
-    "chunk_size": 40,
+    "chunk_size": 6,
     "start_year": 2015,
     "lag_months": 2,
 }
@@ -372,7 +373,7 @@ def transform_response(raw_data):
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_eurostat(citizen_codes, geo_codes, time_periods):
-    """Fetch selected nationalities in chunks, using the thesis ETL API pattern."""
+    """Fetch all selected nationalities in small batches to keep API requests manageable."""
     frames = []
     chunk_size = int(CFG["chunk_size"])
     chunks = [
@@ -447,13 +448,13 @@ def style_chart(fig, title, height=420, legend=False):
             y=0.96,
             xanchor="left",
             yanchor="top",
-            font=dict(size=18, color=NAVY),
+            font=dict(size=18, color=FOREST),
         ),
         height=height,
         margin=dict(l=18, r=18, t=108 if legend else 80, b=25),
         plot_bgcolor="white",
         paper_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#365B6D"),
+        font=dict(color=TEXT),
         hoverlabel=dict(bgcolor="white", font_size=13),
     )
 
@@ -497,6 +498,14 @@ def clear_filters():
     st.session_state["years"] = DEFAULT_YEAR_RANGE
 
 
+def select_all_countries():
+    st.session_state["countries"] = list(COUNTRIES.keys())
+
+
+def select_all_nationalities():
+    st.session_state["nationalities"] = list(NATIONALITIES.keys())
+
+
 with st.sidebar:
     st.header("Dashboard filters")
     st.button(
@@ -505,18 +514,39 @@ with st.sidebar:
         on_click=clear_filters,
     )
 
+    st.markdown("**Country of asylum**")
+    st.button(
+        "Select all countries",
+        key="select_all_countries_button",
+        use_container_width=True,
+        on_click=select_all_countries,
+    )
     selected_countries = st.multiselect(
-        "Country of asylum",
+        "Choose countries",
         list(COUNTRIES.keys()),
         default=DEFAULT_COUNTRIES,
         key="countries",
+        label_visibility="collapsed",
+        placeholder="Select countries of asylum",
+    )
+
+    st.markdown("**Nationality**")
+    st.button(
+        "Select all nationalities",
+        key="select_all_nationalities_button",
+        use_container_width=True,
+        on_click=select_all_nationalities,
     )
     selected_nationalities = st.multiselect(
-        "Nationality",
+        "Choose nationalities",
         list(NATIONALITIES.keys()),
         default=DEFAULT_NATIONALITIES,
         key="nationalities",
+        label_visibility="collapsed",
+        placeholder="Select nationalities",
     )
+    st.caption("Selecting all options may take longer. Results are cached for one hour.")
+
     selected_years = st.slider(
         "Year range",
         min_value=CFG["start_year"],
@@ -538,13 +568,6 @@ with st.sidebar:
 if not selected_countries or not selected_nationalities:
     st.warning("Select at least one country of asylum and one nationality.")
     st.stop()
-
-if len(selected_countries) > 10 or len(selected_nationalities) > 20:
-    st.warning(
-        "For performance, select at most 10 asylum countries and 20 nationalities."
-    )
-    st.stop()
-
 
 # Convert the selected year range into an explicit monthly period list.
 start_year, end_year = selected_years
@@ -756,7 +779,7 @@ with left:
         y="Country of asylum",
         orientation="h",
         color="First-time applications",
-        color_continuous_scale=["#D7E7FF", EU_BLUE],
+        color_continuous_scale=["#E6F2E9", "#78B68E", FOREST],
         text_auto=".3s",
     )
     style_chart(fig_country, "Applications by country of asylum", 470)
@@ -783,7 +806,7 @@ with right:
         y="Nationality",
         orientation="h",
         color="First-time applications",
-        color_continuous_scale=["#D7F3FA", UNHCR_BLUE],
+        color_continuous_scale=["#E6F2E9", "#78B68E", GREEN],
         text_auto=".3s",
     )
     style_chart(fig_nat, "Applications by nationality", 470)
@@ -805,11 +828,14 @@ matrix = df.pivot_table(
     fill_value=0,
 )
 
+# Keep the heatmap readable when every country and nationality is selected.
+heatmap_labels = ".3s" if len(matrix) <= 12 and len(matrix.columns) <= 12 else False
+
 fig_heat = px.imshow(
     matrix,
     aspect="auto",
-    color_continuous_scale=["#F4F7FF", "#7DA7E8", EU_BLUE],
-    text_auto=".3s",
+    color_continuous_scale=["#F3F8F4", "#A8D2B5", FOREST],
+    text_auto=heatmap_labels,
     labels=dict(color="Applications"),
 )
 style_chart(
@@ -868,7 +894,7 @@ if not map_data.empty:
             "Latitude": False,
             "Longitude": False,
         },
-        color_continuous_scale=["#80D4EE", UNHCR_BLUE, EU_BLUE],
+        color_continuous_scale=["#BFE3C9", MID_GREEN, FOREST],
         map_style="open-street-map",
         zoom=2.3,
         center={"lat": 50, "lon": 12},
@@ -881,7 +907,7 @@ if not map_data.empty:
             y=0.97,
             xanchor="left",
             yanchor="top",
-            font=dict(size=18, color=NAVY),
+            font=dict(size=18, color=FOREST),
         ),
         height=560,
         margin=dict(l=8, r=8, t=65, b=8),
