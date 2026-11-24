@@ -1,4 +1,4 @@
-import math
+import io
 from datetime import datetime
 
 import pandas as pd
@@ -8,158 +8,166 @@ import streamlit as st
 
 st.set_page_config(page_title="Eurostat Asylum Insights", page_icon="🟦", layout="wide")
 
-# -----------------------------
-# Visual theme
-# -----------------------------
 EU_BLUE = "#003399"
-EU_LIGHT = "#EAF0FF"
 UNHCR_BLUE = "#0072BC"
 NAVY = "#003B5C"
 GOLD = "#FFCC00"
 GRID = "#DCE5F2"
 COLORS = [EU_BLUE, UNHCR_BLUE, "#4E79A7", "#59C3E6", "#6F4EBA", "#2A9D8F", "#F4A261", "#E76F51"]
 
-st.markdown(
-    """
+st.markdown("""
 <style>
 .stApp {background:linear-gradient(180deg,#F8FAFF 0%,#EDF3FA 100%);}
 .block-container {padding-top:1.3rem;padding-bottom:2rem;max-width:1480px;}
 h1,h2,h3 {color:#003B5C;}
 .hero {padding:24px 28px;border-radius:18px;color:white;margin-bottom:18px;background:linear-gradient(110deg,#003B5C,#003399 55%,#0072BC);box-shadow:0 10px 30px rgba(0,51,153,.18);}
-.hero h1 {color:white;margin:0;font-size:2rem;}
-.hero p {color:#EAF0FF;margin:8px 0 0;}
+.hero h1 {color:white;margin:0;font-size:2rem;}.hero p {color:#EAF0FF;margin:8px 0 0;}
 .section-title {font-size:1.15rem;font-weight:750;color:#003B5C;margin:16px 0 8px;}
 div[data-testid="stMetric"] {background:white;border:1px solid #D4E1F1;padding:17px 19px;border-radius:15px;box-shadow:0 5px 16px rgba(0,59,92,.07);}
-div[data-testid="stMetricLabel"] {color:#516979;font-weight:600;}
-div[data-testid="stMetricValue"] {color:#003399;font-weight:800;}
+div[data-testid="stMetricLabel"] {color:#516979;font-weight:600;} div[data-testid="stMetricValue"] {color:#003399;font-weight:800;}
 div[data-testid="stPlotlyChart"] {background:white;border:1px solid #D4E1F1;border-radius:15px;padding:8px;overflow:hidden;box-shadow:0 5px 16px rgba(0,59,92,.06);}
 section[data-testid="stSidebar"] {background:#003B5C;}
 section[data-testid="stSidebar"] h1,section[data-testid="stSidebar"] h2,section[data-testid="stSidebar"] h3,section[data-testid="stSidebar"] label,section[data-testid="stSidebar"] p {color:white !important;}
-section[data-testid="stSidebar"] button {border-radius:10px;}
-section[data-testid="stSidebar"] button p {color:#111 !important;}
+section[data-testid="stSidebar"] button {border-radius:10px;} section[data-testid="stSidebar"] button p {color:#111 !important;}
 .note {background:#FFF;border-left:5px solid #FFCC00;padding:11px 14px;border-radius:0 10px 10px 0;color:#365B6D;margin:8px 0 14px;}
 </style>
-""",
-    unsafe_allow_html=True,
-)
+""", unsafe_allow_html=True)
 
-# -----------------------------
-# Eurostat selections
-# Codes follow Eurostat conventions. Greece is EL and the UK is UK.
-# -----------------------------
-ASYLUM_COUNTRIES = {
-    "Austria": "AT", "Belgium": "BE", "Bulgaria": "BG", "Croatia": "HR", "Cyprus": "CY",
-    "Czechia": "CZ", "Denmark": "DK", "Estonia": "EE", "Finland": "FI", "France": "FR",
-    "Germany": "DE", "Greece": "EL", "Hungary": "HU", "Iceland": "IS", "Ireland": "IE",
-    "Italy": "IT", "Latvia": "LV", "Liechtenstein": "LI", "Lithuania": "LT", "Luxembourg": "LU",
-    "Malta": "MT", "Netherlands": "NL", "Norway": "NO", "Poland": "PL", "Portugal": "PT",
-    "Romania": "RO", "Slovakia": "SK", "Slovenia": "SI", "Spain": "ES", "Sweden": "SE",
-    "Switzerland": "CH", "United Kingdom": "UK", "Montenegro": "ME",
+COUNTRIES = {
+    "Austria":"AT","Belgium":"BE","Bulgaria":"BG","Croatia":"HR","Cyprus":"CY","Czechia":"CZ",
+    "Denmark":"DK","Estonia":"EE","Finland":"FI","France":"FR","Germany":"DE","Greece":"EL",
+    "Hungary":"HU","Iceland":"IS","Ireland":"IE","Italy":"IT","Latvia":"LV","Liechtenstein":"LI",
+    "Lithuania":"LT","Luxembourg":"LU","Malta":"MT","Netherlands":"NL","Norway":"NO","Poland":"PL",
+    "Portugal":"PT","Romania":"RO","Slovakia":"SK","Slovenia":"SI","Spain":"ES","Sweden":"SE",
+    "Switzerland":"CH","United Kingdom":"UK","Montenegro":"ME"
 }
 
-# A practical set of nationalities frequently used in European asylum analysis.
-# More can be added later by inserting the Eurostat citizenship code.
 NATIONALITIES = {
-    "Afghanistan": "AF", "Albania": "AL", "Algeria": "DZ", "Bangladesh": "BD", "Belarus": "BY",
-    "Cameroon": "CM", "China": "CN", "Colombia": "CO", "Congo, Democratic Republic": "CD",
-    "Côte d’Ivoire": "CI", "Egypt": "EG", "Eritrea": "ER", "Ethiopia": "ET", "Georgia": "GE",
-    "Guinea": "GN", "India": "IN", "Iran": "IR", "Iraq": "IQ", "Lebanon": "LB", "Mali": "ML",
-    "Morocco": "MA", "Nigeria": "NG", "North Macedonia": "MK", "Pakistan": "PK", "Palestine": "PS",
-    "Russia": "RU", "Senegal": "SN", "Serbia": "RS", "Somalia": "SO", "Sudan": "SD",
-    "Syria": "SY", "Tunisia": "TN", "Türkiye": "TR", "Ukraine": "UA", "Venezuela": "VE",
+    "Afghanistan":"AF","Albania":"AL","Algeria":"DZ","Bangladesh":"BD","Belarus":"BY","Cameroon":"CM",
+    "China":"CN","Colombia":"CO","DR Congo":"CD","Côte d’Ivoire":"CI","Egypt":"EG","Eritrea":"ER",
+    "Ethiopia":"ET","Georgia":"GE","Guinea":"GN","India":"IN","Iran":"IR","Iraq":"IQ","Lebanon":"LB",
+    "Mali":"ML","Morocco":"MA","Nigeria":"NG","North Macedonia":"MK","Pakistan":"PK","Palestine":"PS",
+    "Russia":"RU","Senegal":"SN","Serbia":"RS","Somalia":"SO","Sudan":"SD","Syria":"SY","Tunisia":"TN",
+    "Türkiye":"TR","Ukraine":"UA","Venezuela":"VE"
 }
 
 CAPITALS = {
-    "AT": (48.2082,16.3738,"Vienna"), "BE": (50.8503,4.3517,"Brussels"), "BG": (42.6977,23.3219,"Sofia"),
-    "HR": (45.8150,15.9819,"Zagreb"), "CY": (35.1856,33.3823,"Nicosia"), "CZ": (50.0755,14.4378,"Prague"),
-    "DK": (55.6761,12.5683,"Copenhagen"), "EE": (59.4370,24.7536,"Tallinn"), "FI": (60.1699,24.9384,"Helsinki"),
-    "FR": (48.8566,2.3522,"Paris"), "DE": (52.5200,13.4050,"Berlin"), "EL": (37.9838,23.7275,"Athens"),
-    "HU": (47.4979,19.0402,"Budapest"), "IS": (64.1466,-21.9426,"Reykjavik"), "IE": (53.3498,-6.2603,"Dublin"),
-    "IT": (41.9028,12.4964,"Rome"), "LV": (56.9496,24.1052,"Riga"), "LI": (47.1410,9.5209,"Vaduz"),
-    "LT": (54.6872,25.2797,"Vilnius"), "LU": (49.6116,6.1319,"Luxembourg"), "MT": (35.8989,14.5146,"Valletta"),
-    "NL": (52.3676,4.9041,"Amsterdam"), "NO": (59.9139,10.7522,"Oslo"), "PL": (52.2297,21.0122,"Warsaw"),
-    "PT": (38.7223,-9.1393,"Lisbon"), "RO": (44.4268,26.1025,"Bucharest"), "SK": (48.1486,17.1077,"Bratislava"),
-    "SI": (46.0569,14.5058,"Ljubljana"), "ES": (40.4168,-3.7038,"Madrid"), "SE": (59.3293,18.0686,"Stockholm"),
-    "CH": (46.9480,7.4474,"Bern"), "UK": (51.5074,-0.1278,"London"), "ME": (42.4304,19.2594,"Podgorica"),
+    "AT":(48.2082,16.3738,"Vienna"),"BE":(50.8503,4.3517,"Brussels"),"BG":(42.6977,23.3219,"Sofia"),
+    "HR":(45.8150,15.9819,"Zagreb"),"CY":(35.1856,33.3823,"Nicosia"),"CZ":(50.0755,14.4378,"Prague"),
+    "DK":(55.6761,12.5683,"Copenhagen"),"EE":(59.4370,24.7536,"Tallinn"),"FI":(60.1699,24.9384,"Helsinki"),
+    "FR":(48.8566,2.3522,"Paris"),"DE":(52.5200,13.4050,"Berlin"),"EL":(37.9838,23.7275,"Athens"),
+    "HU":(47.4979,19.0402,"Budapest"),"IS":(64.1466,-21.9426,"Reykjavik"),"IE":(53.3498,-6.2603,"Dublin"),
+    "IT":(41.9028,12.4964,"Rome"),"LV":(56.9496,24.1052,"Riga"),"LI":(47.1410,9.5209,"Vaduz"),
+    "LT":(54.6872,25.2797,"Vilnius"),"LU":(49.6116,6.1319,"Luxembourg"),"MT":(35.8989,14.5146,"Valletta"),
+    "NL":(52.3676,4.9041,"Amsterdam"),"NO":(59.9139,10.7522,"Oslo"),"PL":(52.2297,21.0122,"Warsaw"),
+    "PT":(38.7223,-9.1393,"Lisbon"),"RO":(44.4268,26.1025,"Bucharest"),"SK":(48.1486,17.1077,"Bratislava"),
+    "SI":(46.0569,14.5058,"Ljubljana"),"ES":(40.4168,-3.7038,"Madrid"),"SE":(59.3293,18.0686,"Stockholm"),
+    "CH":(46.9480,7.4474,"Bern"),"UK":(51.5074,-0.1278,"London"),"ME":(42.4304,19.2594,"Podgorica")
 }
 
-EUROSTAT_URL = "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/migr_asyappctzm"
+DATASET = "migr_asyappctzm"
+BASE_URL = f"https://ec.europa.eu/eurostat/api/dissemination/sdmx/3.0/data/dataflow/ESTAT/{DATASET}/1.0/*.*.*.*.*.*.*"
+SEX_CODES = ["M", "F", "UNK"]
+AGE_CODES = ["Y_LT14", "Y14-17", "Y18-34", "Y35-64", "Y_GE65", "UNK"]
+APPLICANT_CODES = ["FRST"]
 
 
-def decode_jsonstat(payload):
-    """Convert Eurostat's JSON-stat response into a tidy DataFrame."""
-    dim_ids = payload.get("id", [])
-    sizes = payload.get("size", [])
-    dimensions = payload.get("dimension", {})
-    values = payload.get("value", {})
-    statuses = payload.get("status", {})
+def join_vals(values):
+    return "+".join(values)
 
-    code_by_position = {}
-    label_by_code = {}
-    for dim in dim_ids:
-        category = dimensions[dim]["category"]
-        index = category.get("index", {})
-        if isinstance(index, list):
-            ordered_codes = index
-        else:
-            ordered_codes = [code for code, _ in sorted(index.items(), key=lambda pair: pair[1])]
-        code_by_position[dim] = ordered_codes
-        label_by_code[dim] = category.get("label", {})
 
-    rows = []
-    for flat_key, value in values.items():
-        flat_index = int(flat_key)
-        coordinates = [0] * len(sizes)
-        remainder = flat_index
-        for i in range(len(sizes) - 1, -1, -1):
-            coordinates[i] = remainder % sizes[i]
-            remainder //= sizes[i]
+def observation_value_and_flag(cell):
+    """Parse a Eurostat TSV cell such as '125 p', ':', or '80 b'."""
+    if pd.isna(cell):
+        return None, ""
+    text = str(cell).strip()
+    if not text or text.startswith(":"):
+        return None, text[1:].strip() if len(text) > 1 else ""
+    parts = text.split()
+    try:
+        value = float(parts[0].replace(",", ""))
+    except ValueError:
+        return None, ""
+    return value, " ".join(parts[1:])
 
-        row = {"value": value, "status": statuses.get(str(flat_key), "")}
-        for dim, coordinate in zip(dim_ids, coordinates):
-            code = code_by_position[dim][coordinate]
-            row[dim] = code
-            row[f"{dim}_label"] = label_by_code[dim].get(code, code)
-        rows.append(row)
 
-    return pd.DataFrame(rows)
+def parse_eurostat_tsv(text, nationality_name):
+    """Convert Eurostat's wide TSV time series into tidy monthly observations."""
+    raw = pd.read_csv(io.StringIO(text), sep="\t", dtype=str)
+    if raw.empty:
+        return pd.DataFrame()
+
+    series_col = raw.columns[0]
+    dimension_names = series_col.replace("\\TIME_PERIOD", "").split(",")
+    series_values = raw[series_col].str.split(",", expand=True)
+    series_values.columns = dimension_names
+    wide = pd.concat([series_values, raw.drop(columns=[series_col])], axis=1)
+
+    period_columns = [column for column in raw.columns[1:] if str(column).strip()]
+    tidy = wide.melt(
+        id_vars=dimension_names,
+        value_vars=period_columns,
+        var_name="Period",
+        value_name="Observation",
+    )
+    tidy["Period"] = tidy["Period"].str.strip()
+    parsed = tidy["Observation"].apply(observation_value_and_flag)
+    tidy[["First-time applications", "Status"]] = pd.DataFrame(parsed.tolist(), index=tidy.index)
+    tidy = tidy.dropna(subset=["First-time applications"])
+    tidy["Nationality"] = nationality_name
+    tidy["Date"] = pd.to_datetime(tidy["Period"], format="%Y-%m", errors="coerce")
+    tidy = tidy.dropna(subset=["Date"])
+    return tidy
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def fetch_eurostat(country_codes, nationality_codes, start_period, end_period):
-    params = [
-        ("lang", "en"), ("freq", "M"), ("unit", "PER"), ("sex", "T"),
-        ("age", "TOTAL"), ("asyl_app", "NASY_APP"),
-        ("sinceTimePeriod", start_period), ("untilTimePeriod", end_period),
-    ]
-    params.extend(("geo", code) for code in country_codes)
-    params.extend(("citizen", code) for code in nationality_codes)
-
+def fetch_one_nationality(nationality_name, citizen_code, geo_codes, time_periods):
+    params = {
+        "c[freq]": "M",
+        "c[unit]": "PER",
+        "c[citizen]": citizen_code,
+        "c[sex]": join_vals(SEX_CODES),
+        "c[applicant]": join_vals(APPLICANT_CODES),
+        "c[age]": join_vals(AGE_CODES),
+        "c[geo]": join_vals(geo_codes),
+        "c[TIME_PERIOD]": join_vals(time_periods),
+        "compress": "true",
+        "format": "tsv",
+    }
+    headers = {"Accept": "text/tab-separated-values", "User-Agent": "Eurostat-Asylum-Streamlit-App/1.0"}
     try:
-        response = requests.get(EUROSTAT_URL, params=params, timeout=60)
+        response = requests.get(BASE_URL, params=params, headers=headers, timeout=90)
         response.raise_for_status()
-        payload = response.json()
     except requests.exceptions.Timeout as exc:
-        raise RuntimeError("Eurostat took too long to respond. Please try a shorter period or fewer selections.") from exc
+        raise RuntimeError("Eurostat took too long to respond. Try fewer countries, nationalities, or years.") from exc
     except requests.exceptions.RequestException as exc:
-        raise RuntimeError(f"The app could not retrieve Eurostat data: {exc}") from exc
-    except ValueError as exc:
-        raise RuntimeError("Eurostat returned an invalid response.") from exc
+        details = ""
+        if getattr(exc, "response", None) is not None:
+            details = f" Eurostat response: {exc.response.text[:300]}"
+        raise RuntimeError(f"Eurostat SDMX request failed: {exc}.{details}") from exc
+    return parse_eurostat_tsv(response.text, nationality_name)
 
-    data = decode_jsonstat(payload)
-    if data.empty:
-        return data, payload.get("updated", "")
 
-    data = data.rename(columns={
-        "geo_label": "Country of asylum", "citizen_label": "Nationality",
-        "time": "Period", "value": "First-time applications", "status": "Status",
-    })
-    data["Date"] = pd.to_datetime(data["Period"], format="%Y-%m", errors="coerce")
-    data["Year"] = data["Date"].dt.year
-    data["Month"] = data["Date"].dt.strftime("%b")
-    data["First-time applications"] = pd.to_numeric(data["First-time applications"], errors="coerce")
-    data = data.dropna(subset=["Date", "First-time applications"])
-    return data, payload.get("updated", "")
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_eurostat(nationality_items, geo_codes, time_periods):
+    frames = []
+    for nationality_name, citizen_code in nationality_items:
+        frame = fetch_one_nationality(nationality_name, citizen_code, geo_codes, time_periods)
+        if not frame.empty:
+            frames.append(frame)
+    if not frames:
+        return pd.DataFrame()
+
+    detailed = pd.concat(frames, ignore_index=True)
+    detailed["Country code"] = detailed["geo"]
+    country_by_code = {code: name for name, code in COUNTRIES.items()}
+    detailed["Country of asylum"] = detailed["Country code"].map(country_by_code).fillna(detailed["Country code"])
+    detailed["Year"] = detailed["Date"].dt.year
+    detailed["Month"] = detailed["Date"].dt.strftime("%b")
+
+    # Sex and age categories in the query are mutually exclusive. Summing them
+    # produces the total first-time applicants for each country-nationality-month.
+    return detailed
 
 
 def style_chart(fig, title, height=420, legend=False):
@@ -174,12 +182,10 @@ def style_chart(fig, title, height=420, legend=False):
     return fig
 
 
-# -----------------------------
-# Header and controls
-# -----------------------------
-st.markdown("""<div class="hero"><h1>🟦 Eurostat Asylum Insights</h1><p>First-time asylum applications by month, year, country of asylum and nationality</p></div>""", unsafe_allow_html=True)
+st.markdown('<div class="hero"><h1>🟦 Eurostat Asylum Insights</h1><p>First-time asylum applications by month, year, country of asylum and nationality</p></div>', unsafe_allow_html=True)
 
-current_year = datetime.now().year
+now = datetime.now()
+current_year = now.year
 DEFAULT_COUNTRIES = ["Greece", "Germany", "France", "Italy", "Spain"]
 DEFAULT_NATIONALITIES = ["Syria", "Afghanistan", "Türkiye", "Venezuela", "Colombia"]
 
@@ -193,51 +199,55 @@ def clear_filters():
 with st.sidebar:
     st.header("Dashboard filters")
     st.button("↻ Clear all filters", use_container_width=True, on_click=clear_filters)
-    selected_countries = st.multiselect("Country of asylum", list(ASYLUM_COUNTRIES), default=DEFAULT_COUNTRIES, key="countries")
+    selected_countries = st.multiselect("Country of asylum", list(COUNTRIES), default=DEFAULT_COUNTRIES, key="countries")
     selected_nationalities = st.multiselect("Nationality", list(NATIONALITIES), default=DEFAULT_NATIONALITIES, key="nationalities")
     selected_years = st.slider("Year range", 2008, current_year, (max(2015, current_year - 5), current_year), key="years")
     st.divider()
-    st.caption("The app requests monthly first-time applicant data directly from Eurostat dataset migr_asyappctzm.")
+    st.caption("Source: Eurostat SDMX 3.0 API, migr_asyappctzm. Applicant code: FRST.")
 
 if not selected_countries or not selected_nationalities:
     st.warning("Select at least one country of asylum and one nationality.")
     st.stop()
-if len(selected_countries) > 10 or len(selected_nationalities) > 15:
-    st.warning("For speed and readability, select up to 10 asylum countries and 15 nationalities.")
+if len(selected_countries) > 10 or len(selected_nationalities) > 10:
+    st.warning("For API performance, select at most 10 countries and 10 nationalities.")
     st.stop()
 
 start_year, end_year = selected_years
-start_period = f"{start_year}-01"
-end_period = f"{end_year}-12"
+periods = pd.period_range(f"{start_year}-01", f"{end_year}-12", freq="M").astype(str).tolist()
+# Do not request future months in the current year.
+periods = [period for period in periods if period <= now.strftime("%Y-%m")]
 
-with st.spinner("Retrieving asylum data from Eurostat..."):
+with st.spinner("Retrieving first-time asylum data from Eurostat SDMX 3.0..."):
     try:
-        df, last_updated = fetch_eurostat(
-            [ASYLUM_COUNTRIES[name] for name in selected_countries],
-            [NATIONALITIES[name] for name in selected_nationalities],
-            start_period,
-            end_period,
+        detail = fetch_eurostat(
+            [(name, NATIONALITIES[name]) for name in selected_nationalities],
+            [COUNTRIES[name] for name in selected_countries],
+            periods,
         )
     except RuntimeError as error:
         st.error(str(error))
         st.stop()
 
-if df.empty:
-    st.warning("Eurostat returned no observations for this selection. Try a broader period or different countries/nationalities.")
+if detail.empty:
+    st.warning("Eurostat returned no data for this selection. Try another nationality, country, or period.")
     st.stop()
 
-# -----------------------------
-# KPIs
-# -----------------------------
+# Aggregate the requested disjoint age and sex categories to totals.
+df = detail.groupby(
+    ["Date", "Year", "Month", "Country code", "Country of asylum", "Nationality"],
+    as_index=False,
+).agg(
+    **{"First-time applications": ("First-time applications", "sum")},
+    Status=("Status", lambda values: ", ".join(sorted({v for v in values if v}))),
+)
+
 latest_date = df["Date"].max()
-latest_month = df[df["Date"] == latest_date]
+latest_total = df.loc[df["Date"] == latest_date, "First-time applications"].sum()
 previous_date = latest_date - pd.DateOffset(months=1)
-previous_month = df[df["Date"] == previous_date]
-latest_total = latest_month["First-time applications"].sum()
-previous_total = previous_month["First-time applications"].sum()
-monthly_change = ((latest_total - previous_total) / previous_total) if previous_total else None
+previous_total = df.loc[df["Date"] == previous_date, "First-time applications"].sum()
+monthly_change = (latest_total - previous_total) / previous_total if previous_total else None
 period_total = df["First-time applications"].sum()
-latest_year_total = df[df["Year"] == latest_date.year]["First-time applications"].sum()
+latest_year_total = df.loc[df["Year"] == latest_date.year, "First-time applications"].sum()
 top_country = df.groupby("Country of asylum")["First-time applications"].sum().idxmax()
 top_nationality = df.groupby("Nationality")["First-time applications"].sum().idxmax()
 
@@ -248,12 +258,8 @@ k2.metric(f"Latest month · {latest_date:%b %Y}", f"{latest_total:,.0f}", f"{mon
 k3.metric(f"{latest_date.year} total", f"{latest_year_total:,.0f}")
 k4.metric("Top asylum country", top_country)
 k5.metric("Top nationality", top_nationality)
+st.markdown('<div class="note">The current year may be incomplete. Eurostat flags such as p (provisional), b (break in series), and d (definition differs) are retained in the downloadable data.</div>', unsafe_allow_html=True)
 
-st.markdown('<div class="note">The latest calendar year may be incomplete. Eurostat observations may also carry provisional, break-in-series or other status flags.</div>', unsafe_allow_html=True)
-
-# -----------------------------
-# Trends
-# -----------------------------
 st.markdown('<div class="section-title">Applications over time</div>', unsafe_allow_html=True)
 monthly = df.groupby(["Date", "Country of asylum"], as_index=False)["First-time applications"].sum()
 fig_monthly = px.line(monthly, x="Date", y="First-time applications", color="Country of asylum", markers=True, color_discrete_sequence=COLORS)
@@ -270,12 +276,8 @@ fig_yearly.update_xaxes(title="Year", dtick=1, gridcolor=GRID)
 fig_yearly.update_yaxes(title="First-time applications", tickformat=",.0f", gridcolor=GRID)
 st.plotly_chart(fig_yearly, use_container_width=True)
 
-# -----------------------------
-# Country and nationality analysis
-# -----------------------------
 st.markdown('<div class="section-title">Country and nationality analysis</div>', unsafe_allow_html=True)
 left, right = st.columns(2)
-
 country_totals = df.groupby("Country of asylum", as_index=False)["First-time applications"].sum().sort_values("First-time applications")
 with left:
     fig_country = px.bar(country_totals, x="First-time applications", y="Country of asylum", orientation="h", color="First-time applications", color_continuous_scale=["#D7E7FF", EU_BLUE], text_auto=".3s")
@@ -294,7 +296,6 @@ with right:
     fig_nationality.update_yaxes(title="")
     st.plotly_chart(fig_nationality, use_container_width=True)
 
-# Country-nationality matrix
 matrix = df.pivot_table(index="Nationality", columns="Country of asylum", values="First-time applications", aggfunc="sum", fill_value=0)
 fig_heat = px.imshow(matrix, aspect="auto", color_continuous_scale=["#F4F7FF", "#7DA7E8", EU_BLUE], text_auto=".3s", labels=dict(color="Applications"))
 style_chart(fig_heat, "Country of asylum × nationality", max(420, 42 * len(matrix) + 120))
@@ -302,12 +303,9 @@ fig_heat.update_xaxes(title="Country of asylum")
 fig_heat.update_yaxes(title="Nationality")
 st.plotly_chart(fig_heat, use_container_width=True)
 
-# -----------------------------
-# Real tile-based asylum-country map
-# -----------------------------
 st.markdown('<div class="section-title">Geographic view</div>', unsafe_allow_html=True)
 map_data = country_totals.copy()
-code_lookup = {name: code for name, code in ASYLUM_COUNTRIES.items()}
+code_lookup = {name: code for name, code in COUNTRIES.items()}
 map_data["Code"] = map_data["Country of asylum"].map(code_lookup)
 map_data["Latitude"] = map_data["Code"].map(lambda code: CAPITALS.get(code, (None, None, None))[0])
 map_data["Longitude"] = map_data["Code"].map(lambda code: CAPITALS.get(code, (None, None, None))[1])
@@ -315,36 +313,20 @@ map_data["Capital"] = map_data["Code"].map(lambda code: CAPITALS.get(code, (None
 map_data = map_data.dropna(subset=["Latitude", "Longitude"])
 max_map_value = map_data["First-time applications"].max()
 map_data["Marker_Size"] = 12 + 28 * (map_data["First-time applications"] / max_map_value).pow(.5) if max_map_value else 16
-
 fig_map = px.scatter_map(
     map_data, lat="Latitude", lon="Longitude", size="Marker_Size", size_max=34,
     color="First-time applications", hover_name="Country of asylum",
     hover_data={"Capital": True, "First-time applications": ":,.0f", "Marker_Size": False, "Latitude": False, "Longitude": False},
-    color_continuous_scale=["#80D4EE", UNHCR_BLUE, EU_BLUE], map_style="open-street-map", zoom=2.3,
-    center={"lat": 50, "lon": 12},
+    color_continuous_scale=["#80D4EE", UNHCR_BLUE, EU_BLUE], map_style="open-street-map", zoom=2.3, center={"lat": 50, "lon": 12},
 )
 fig_map.update_traces(marker=dict(opacity=.86))
-fig_map.update_layout(
-    title=dict(text="First-time applications by country of asylum", x=.02, y=.97, xanchor="left", yanchor="top", font=dict(size=18, color=NAVY)),
-    height=560, margin=dict(l=8, r=8, t=65, b=8), paper_bgcolor="rgba(0,0,0,0)",
-    coloraxis_colorbar=dict(title="Applications", thickness=12, len=.65),
-)
+fig_map.update_layout(title=dict(text="First-time applications by country of asylum", x=.02, y=.97, xanchor="left", yanchor="top", font=dict(size=18, color=NAVY)), height=560, margin=dict(l=8, r=8, t=65, b=8), paper_bgcolor="rgba(0,0,0,0)", coloraxis_colorbar=dict(title="Applications", thickness=12, len=.65))
 st.plotly_chart(fig_map, use_container_width=True)
 
-# -----------------------------
-# Data quality and download
-# -----------------------------
 with st.expander("View and download the Eurostat observations"):
-    output_columns = ["Date", "Year", "Month", "Country of asylum", "Nationality", "First-time applications", "Status"]
-    table = df[output_columns].sort_values(["Date", "Country of asylum", "Nationality"], ascending=[False, True, True]).copy()
+    table = df[["Date", "Year", "Month", "Country of asylum", "Nationality", "First-time applications", "Status"]].sort_values(["Date", "Country of asylum", "Nationality"], ascending=[False, True, True]).copy()
     table["Date"] = table["Date"].dt.strftime("%Y-%m")
     st.dataframe(table, use_container_width=True, hide_index=True)
-    st.download_button(
-        "Download selected Eurostat data as CSV",
-        table.to_csv(index=False).encode("utf-8"),
-        file_name="eurostat_first_time_asylum_applications.csv",
-        mime="text/csv",
-    )
+    st.download_button("Download selected Eurostat data as CSV", table.to_csv(index=False).encode("utf-8"), file_name="eurostat_first_time_asylum_applications.csv", mime="text/csv")
 
-updated_text = f" Eurostat response updated: {last_updated}." if last_updated else ""
-st.caption(f"Showing {len(df):,} monthly country-nationality observations. Source: Eurostat, dataset migr_asyappctzm.{updated_text}")
+st.caption(f"Showing {len(df):,} aggregated monthly country-nationality observations. Source: Eurostat SDMX 3.0 API, dataset {DATASET}.")
